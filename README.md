@@ -27,38 +27,57 @@ jumbotail-replenishment-planner/
 ├── reports/            # Generated flat-file procurement reports
 └── sql/                # Core analytical queries for operational tracking
 
-## Requirements
+🛠️ Installation & Setup
+Clone the Repository:
 
-Install dependencies:
+Bash
+git clone [https://github.com/kattubadimohammad/jumbotail-replenishment-planner.git](https://github.com/kattubadimohammad/jumbotail-replenishment-planner.git)
+cd jumbotail-replenishment-planner
+Install Dependencies:
+Ensure you have Python 3.8+ installed, then run:
 
+Bash
 pip install -r requirements.txt
+🚀 Execution Workflow
+Step 1: Data Pipeline Execution
+Open and execute the data pipeline notebook to clear old staging tables, process raw logs, and populate the backend database:
 
-## Run Notebook
+Target File: notebooks/replenishment_planner.ipynb
 
-Open:
+Run all cells to update the inventory metrics and generate automated tables.
 
-notebooks/replenishment_planner.ipynb
+Step 2: Launch the Analytics Dashboard
+Run the production web interface locally to visually inspect, filter, and export the generated purchase orders:
 
-Execute all cells.
+Bash
+streamlit run dashboard/app.py
+📊 Core Deliverables & Artifacts
+reports/replenishment_output.csv – Structured flat-file data export for direct cross-functional sharing.
 
-## Output
+database/replenishment.db – Local SQLite database housing clean relational tables built from the ETL sequence.
 
-- replenishment_output.csv
-- replenishment.db
+sql/queries.sql – Production analytical queries designed to audit fulfillment health metrics and vendor distribution profiles.
 
-## SQL
+Interactive Replenishment Dashboard – A fully deployed cloud interface on Streamlit Cloud featuring:
 
-Two analytical SQL queries are included inside sql/queries.sql.
+Dynamic Dependent Dropdowns: Filter metrics simultaneously by Category and Vendor.
 
-## Assumptions
+Automated Data Caching: Employs @st.cache_data for performance optimization and ultra-low database query latency.
 
-- Planning date is 16 March 2026.
-- Orders are rounded to case size.
-- Storage capacity is respected.
-- Open POs are considered.
+Procurement Execution Desk: Expandable row-level drill-down table with an integrated Export PO to CSV button to streamline procurement pipelines.
 
-## Future Improvements
+📐 Planning Assumptions & Core Logic
+Planning Horizon Baseline: 16 March 2026.
 
-- Demand Forecasting
-- Streamlit Dashboard
-- Automated Vendor PO Generation
+Logistics Alignment: Suggestions are calculated at the SKU level and automatically rounded up to match exact supplier case configurations.
+
+Capacity Safeguards: Recommended inbound volumes are programmatically checked against maximum cubic warehouse constraints.
+
+Pipeline Visibility: Incoming stock from active, unfulfilled POs is treated as incoming supply to prevent over-ordering.
+
+🔮 Future Roadmap & Scalability
+Predictive Demand Forecasting: Integrate predictive models (such as XGBoost or ARIMA) to replace static DRR metrics with seasonal trend forecasts.
+
+Automated Vendor Notification Desk: Wire the execution desk directly into an SMTP/API pipeline to email purchase orders to suppliers with a single click.
+
+Multi-Warehouse Support: Abstract the database structure to manage distribution centers across multiple regional geographies simultaneously.
