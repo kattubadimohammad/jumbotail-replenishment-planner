@@ -41,33 +41,48 @@ if not DB_PATH.exists():
 df_raw = load_raw_data(DB_PATH)
 
 # ----------------------------------------
-# Sidebar Filters (APM Operational Enhancements)
+# Sidebar Filters (10/10 Multi-Filter Setup)
 # ----------------------------------------
-st.sidebar.header("🎯 Dashboard Filters")
+st.sidebar.header("🎯 Operational Control")
 
-# Category Filter
+# 1. Category Filter
 categories = ["All Categories"] + sorted(df_raw["category_name"].dropna().unique().tolist())
 selected_category = st.sidebar.selectbox("Filter by Category", categories)
 
-# Apply filter to dataframe
+# Filter dataframe by category first to make the vendor list dynamic
 if selected_category != "All Categories":
-    df_filtered = df_raw[df_raw["category_name"] == selected_category]
+    df_step = df_raw[df_raw["category_name"] == selected_category]
 else:
-    df_filtered = df_raw.copy()
+    df_step = df_raw.copy()
+
+# 2. Vendor Filter (Updates dynamically based on selected category!)
+vendors = ["All Vendors"] + sorted(df_step["vendor_name"].dropna().unique().tolist())
+selected_vendor = st.sidebar.selectbox("Filter by Vendor", vendors)
+
+# Apply final vendor filter
+if selected_vendor != "All Vendors":
+    df_filtered = df_step[df_step["vendor_name"] == selected_vendor]
+else:
+    df_filtered = df_step.copy()
 
 # ----------------------------------------
-# Summary Metrics
+# Summary Metrics & Operational Insights
 # ----------------------------------------
 st.header("Summary")
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 
 total_skus = len(df_filtered)
 total_units = int(df_filtered["final_suggestion"].sum())
 total_value = df_filtered["final_value"].sum()
 
-col1.metric("Total SKUs", f"{total_skus:,}")
+# Critical SKUs (Items where replenishment suggestion is exceptionally high)
+high_urgency_threshold = df_raw["final_suggestion"].quantile(0.90) if not df_raw.empty else 0
+critical_skus = len(df_filtered[df_filtered["final_suggestion"] >= high_urgency_threshold])
+
+col1.metric("Total SKUs Managed", f"{total_skus:,}")
 col2.metric("Total Suggested Units", f"{total_units:,}")
 col3.metric("Total Order Value", f"₹ {total_value:,.2f}")
+col4.metric("🚨 High Urgency SKUs", f"{critical_skus:,}", help="SKUs in the top 10% of required replenishment quantities.")
 
 st.divider()
 
@@ -94,43 +109,61 @@ col_left, col_right = st.columns(2)
 
 with col_left:
     st.header("Category-wise Order Value")
-    st.bar_chart(
-        category_data, 
-        y="final_value", 
-        color="#FF4B4B",
-        y_label="Total Order Value (₹)"
-    )
+    if not category_data.empty:
+        st.bar_chart(category_data, y="final_value", color="#FF4B4B", y_label="Total Order Value (₹)")
+    else:
+        st.info("No data available for the current selection.")
 
 with col_right:
     st.header("Top 10 Vendors")
-    st.bar_chart(
-        vendor_data, 
-        y="final_value", 
-        horizontal=True, 
-        color="#FF4B4B",
-        x_label="Total Order Value (₹)"
-    )
+    if not vendor_data.empty:
+        st.bar_chart(vendor_data, y="final_value", horizontal=True, color="#FF4B4B", x_label="Total Order Value (₹)")
+    else:
+        st.info("No data available for the current selection.")
 
 st.divider()
 
 st.header("Top 10 Replenishment Required SKUs")
-st.bar_chart(
-    sku_data, 
-    y="final_suggestion", 
-    horizontal=True, 
-    color="#29B5E8",
-    x_label="Suggested Order Quantity (Units)"
-)
+if not sku_data.empty:
+    st.bar_chart(sku_data, y="final_suggestion", horizontal=True, color="#29B5E8", x_label="Suggested Order Quantity (Units)")
+else:
+    st.info("No SKUs currently require replenishment under these filter parameters.")
 
 # ----------------------------------------
-# Raw Data Expansion (Great for APM Reviews)
+# Actionable Data Export (The ERP/Procurement Bridge)
 # ----------------------------------------
 st.divider()
-with st.expander("🔍 Inspect Filtered Replenishment Records"):
-    st.dataframe(
-        df_filtered[["title", "category_name", "vendor_name", "final_suggestion", "final_value"]],
+st.header("📋 Procurement Execution Desk")
+
+# Cleaned up data format for display
+df_display = df_filtered[["title", "category_name", "vendor_name", "final_suggestion", "final_value"]].rename(
+    columns={
+        "title": "Product Title",
+        "category_name": "Category",
+        "vendor_name": "Vendor",
+        "final_suggestion": "Suggested Quantity (Units)",
+        "final_value": "Order Value (INR)"
+    }
+)
+
+# Add a download action right next to data inspection
+col_meta, col_btn = st.columns([4, 1])
+with col_meta:
+    st.write(f"Showing **{len(df_display)}** item lines matching current selection criteria.")
+
+with col_btn:
+    # Convert dataframe to CSV format string
+    csv_data = df_display.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Export PO Data (CSV)",
+        data=csv_data,
+        file_name="jumbotail_replenishment_orders.csv",
+        mime="text/csv",
         use_container_width=True
     )
+
+with st.expander("🔍 Click to Expand and Inspect Full Line-Item Breakdown"):
+    st.dataframe(df_display, use_container_width=True)
 
 # ----------------------------------------
 # Footer
