@@ -28,7 +28,6 @@ DB_PATH = BASE_DIR / "database" / "replenishment.db"
 def load_raw_data(db_file):
     conn = sqlite3.connect(str(db_file))
     try:
-        # Pull the base dataset into a dataframe so we can filter interactively in memory
         df = pd.read_sql("SELECT * FROM replenishment", conn)
         return df
     finally:
@@ -95,16 +94,33 @@ col_left, col_right = st.columns(2)
 
 with col_left:
     st.header("Category-wise Order Value")
-    st.bar_chart(category_data, y="final_value", color="#FF4B4B")
+    st.bar_chart(
+        category_data, 
+        y="final_value", 
+        color="#FF4B4B",
+        y_label="Total Order Value (₹)"
+    )
 
 with col_right:
     st.header("Top 10 Vendors")
-    st.bar_chart(vendor_data, y="final_value", horizontal=True, color="#4CAF50")
+    st.bar_chart(
+        vendor_data, 
+        y="final_value", 
+        horizontal=True, 
+        color="#FF4B4B",
+        x_label="Total Order Value (₹)"
+    )
 
 st.divider()
 
 st.header("Top 10 Replenishment Required SKUs")
-st.bar_chart(sku_data, y="final_suggestion", horizontal=True, color="#29B5E8")
+st.bar_chart(
+    sku_data, 
+    y="final_suggestion", 
+    horizontal=True, 
+    color="#29B5E8",
+    x_label="Suggested Order Quantity (Units)"
+)
 
 # ----------------------------------------
 # Raw Data Expansion (Great for APM Reviews)
