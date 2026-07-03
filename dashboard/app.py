@@ -41,7 +41,7 @@ if not DB_PATH.exists():
 df_raw = load_raw_data(DB_PATH)
 
 # ----------------------------------------
-# Sidebar Filters (10/10 Multi-Filter Setup)
+# Sidebar Filters (Multi-Filter Setup)
 # ----------------------------------------
 st.sidebar.header("🎯 Operational Control")
 
@@ -55,7 +55,7 @@ if selected_category != "All Categories":
 else:
     df_step = df_raw.copy()
 
-# 2. Vendor Filter (Updates dynamically based on selected category!)
+# 2. Vendor Filter (Updates dynamically based on selected category)
 vendors = ["All Vendors"] + sorted(df_step["vendor_name"].dropna().unique().tolist())
 selected_vendor = st.sidebar.selectbox("Filter by Vendor", vendors)
 
@@ -69,7 +69,9 @@ else:
 # Summary Metrics & Operational Insights
 # ----------------------------------------
 st.header("Summary")
-col1, col2, col3, col4 = st.columns(4)
+
+# Custom column ratios [1, 1, 1.3, 1] give the currency metric more space to prevent truncation
+col1, col2, col3, col4 = st.columns([1, 1, 1.3, 1])
 
 total_skus = len(df_filtered)
 total_units = int(df_filtered["final_suggestion"].sum())
@@ -130,12 +132,12 @@ else:
     st.info("No SKUs currently require replenishment under these filter parameters.")
 
 # ----------------------------------------
-# Actionable Data Export (The ERP/Procurement Bridge)
+# Actionable Data Export (The Procurement Desk)
 # ----------------------------------------
 st.divider()
 st.header("📋 Procurement Execution Desk")
 
-# Cleaned up data format for display
+# Cleaned up data format for professional presentation
 df_display = df_filtered[["title", "category_name", "vendor_name", "final_suggestion", "final_value"]].rename(
     columns={
         "title": "Product Title",
@@ -146,13 +148,12 @@ df_display = df_filtered[["title", "category_name", "vendor_name", "final_sugges
     }
 )
 
-# Add a download action right next to data inspection
+# Render operational actions
 col_meta, col_btn = st.columns([4, 1])
 with col_meta:
     st.write(f"Showing **{len(df_display)}** item lines matching current selection criteria.")
 
 with col_btn:
-    # Convert dataframe to CSV format string
     csv_data = df_display.to_csv(index=False).encode('utf-8')
     st.download_button(
         label="📥 Export PO Data (CSV)",
