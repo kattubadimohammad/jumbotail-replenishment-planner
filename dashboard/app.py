@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
-import matplotlib.pyplot as plt
+from pathlib import Path
 
 # ----------------------------------------
 # Page Configuration
@@ -16,134 +16,92 @@ st.title("📦 Jumbotail Replenishment Planner")
 st.caption("Purchase Order Recommendation Dashboard")
 
 # ----------------------------------------
-# Connect SQLite Database
+# Absolute Path Resolution
 # ----------------------------------------
-conn = sqlite3.connect("../database/replenishment.db")
-
-df = pd.read_sql(
-    "SELECT * FROM replenishment",
-    conn
-)
+# This finds the exact directory of app.py, goes up one level, and finds the database
+BASE_DIR = Path(__file__).resolve().parent.parent
+DB_PATH = BASE_DIR / "database" / "replenishment.db"
 
 # ----------------------------------------
-# Summary
+# Cached Database Operations
+# ----------------------------------------
+@st.cache_data
+def load_dashboard_data(db_file):
+    # Convert Path object to string for sqlite3 compatibility
+    conn = sqlite3.connect(str(db_file))
+    try:
+        # Load main data for summary metrics
+        df_summary = pd.read_sql("SELECT final_suggestion, final_value FROM replenishment", conn)
+        total_skus = len(df_summary)
+        total_units = int(df_summary["final_suggestion"].sum())
+        total_value = df_summary["final_value"].sum()
+
+        # Category-wise data
+        df_category = pd.read_sql("""
+            SELECT category_name, SUM(final_value) AS total_order_value 
+            FROM replenishment 
+            GROUP BY category_name 
+            ORDER BY total_order_value DESC
+        """, conn).set_index("category_name")
+
+        # Top Vendors data
+        df_vendor = pd.read_sql("""
+            SELECT vendor_name, SUM(final_value) AS total_order_value 
+            FROM replenishment 
+            GROUP BY vendor_name 
+            ORDER BY total_order_value DESC 
+            LIMIT 10
+        """, conn).set_index("vendor_name")
+
+        # Top SKUs data
+        df_skus = pd.read_sql("""
+            SELECT title, final_suggestion 
+            FROM replenishment 
+            WHERE final_suggestion > 0 
+            ORDER BY final_suggestion DESC 
+            LIMIT 10
+        """, conn).set_index("title")
+
+        return total_skus, total_units, total_value, df_category, df_vendor, df_skus
+    finally:
+        conn.close()
+
+# Safe data loading block
+if not DB_PATH.exists():
+    st.error(f"📁 Database file could not be found at target destination: `{DB_PATH}`")
+    st.stop()
+
+total_skus, total_units, total_value, category, vendor, risk = load_dashboard_data(DB_PATH)
+
+# ----------------------------------------
+# Summary Metrics
 # ----------------------------------------
 st.header("Summary")
-
 col1, col2, col3 = st.columns(3)
 
-col1.metric(
-    "Total SKUs",
-    len(df)
-)
-
-col2.metric(
-    "Total Suggested Units",
-    int(df["final_suggestion"].sum())
-)
-
-col3.metric(
-    "Total Order Value",
-    f"₹ {df['final_value'].sum():,.2f}"
-)
+col1.metric("Total SKUs", f"{total_skus:,}")
+col2.metric("Total Suggested Units", f"{total_units:,}")
+col3.metric("Total Order Value", f"₹ {total_value:,.2f}")
 
 st.divider()
 
 # ----------------------------------------
-# Category-wise Order Value
+# Visualizations
 # ----------------------------------------
-st.header("Category-wise Order Value")
+col_left, col_right = st.columns(2)
 
-category = pd.read_sql("""
-SELECT
-    category_name,
-    SUM(final_value) AS total_order_value
-FROM replenishment
-GROUP BY category_name
-ORDER BY total_order_value DESC
-""", conn)
+with col_left:
+    st.header("Category-wise Order Value")
+    st.bar_chart(category, y="total_order_value", color="#FF4B4B")
 
-fig1, ax1 = plt.subplots(figsize=(12,6))
-
-ax1.bar(
-    category["category_name"],
-    category["total_order_value"]
-)
-
-ax1.set_title("Category-wise Suggested Order Value")
-ax1.set_xlabel("Category")
-ax1.set_ylabel("Order Value")
-
-plt.xticks(rotation=35, ha="right")
-plt.tight_layout()
-
-st.pyplot(fig1)
+with col_right:
+    st.header("Top 10 Vendors")
+    st.bar_chart(vendor, y="total_order_value", horizontal=True)
 
 st.divider()
 
-# ----------------------------------------
-# Top Vendors
-# ----------------------------------------
-st.header("Top 10 Vendors")
-
-vendor = pd.read_sql("""
-SELECT
-    vendor_name,
-    SUM(final_value) AS total_order_value
-FROM replenishment
-GROUP BY vendor_name
-ORDER BY total_order_value DESC
-LIMIT 10
-""", conn)
-
-fig2, ax2 = plt.subplots(figsize=(11,6))
-
-ax2.barh(
-    vendor["vendor_name"],
-    vendor["total_order_value"]
-)
-
-ax2.invert_yaxis()
-
-ax2.set_title("Top 10 Vendors")
-ax2.set_xlabel("Suggested Order Value")
-
-plt.tight_layout()
-
-st.pyplot(fig2)
-
-st.divider()
-
-# ----------------------------------------
-# Top Replenishment Required SKUs
-# ----------------------------------------
 st.header("Top 10 Replenishment Required SKUs")
-
-risk = pd.read_sql("""
-SELECT
-    title,
-    final_suggestion
-FROM replenishment
-WHERE final_suggestion > 0
-ORDER BY final_suggestion DESC
-LIMIT 10
-""", conn)
-
-fig3, ax3 = plt.subplots(figsize=(11,6))
-
-ax3.barh(
-    risk["title"],
-    risk["final_suggestion"]
-)
-
-ax3.invert_yaxis()
-
-ax3.set_title("Top 10 Replenishment Required SKUs")
-ax3.set_xlabel("Suggested Order Quantity")
-
-plt.tight_layout()
-
-st.pyplot(fig3)
+st.bar_chart(risk, y="final_suggestion", horizontal=True, color="#29B5E8")
 
 st.divider()
 
@@ -153,5 +111,3 @@ st.divider()
 st.caption(
     "Developed by Kattubadi Mohammad | Associate Programme Manager Assignment"
 )
-
-conn.close()
